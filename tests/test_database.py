@@ -1,7 +1,7 @@
 import pytest
-from unittest.mock import patch, Mock
+from unittest.mock import patch, Mock, MagicMock
 import psycopg2
-from lib.database import DatabaseConnection, DatabaseConnectionExecutionError, QueryMetric
+from lib.database import DatabaseConnection, DatabaseConnectionError, QueryMetric
 from contextlib import nullcontext
 
 
@@ -12,7 +12,7 @@ def db_connection():
         port=5432,
         db_name="test_db",
         db_user="test_user",
-        db_password="test_password"
+        db_password="test_password",
     )
 
 
@@ -66,9 +66,9 @@ def test_execute_query_no_result(db_connection, mock_connect):
     assert result.timing > 0
 
 
-def test_execute_query_error(db_connection, mock_connect):
+def test_database_connection_error(db_connection, mock_connect):
     mock_connect.side_effect = psycopg2.OperationalError
 
     query = "SELECT * FROM table"
-    with pytest.raises(DatabaseConnectionExecutionError):
+    with pytest.raises(DatabaseConnectionError):
         db_connection.execute_query(query)

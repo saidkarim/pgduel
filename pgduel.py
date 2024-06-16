@@ -60,24 +60,32 @@ def query(
     """Compares the performance of queries  between 2 databases."""
     dsn1 = compose_dsn(host1, port1, dbname1, user1, password1, database1)
     dsn2 = compose_dsn(host2, port2, dbname2, user2, password2, database2)
+    command_to_execute = None
     if command is None and file is None:
         logger.error("command and file parameters both cannot be empty.")
         sys.exit(1)
     elif command:
-        runner = Runner(dsn1, dsn2, command)
+        command_to_execute = command
     else:
         try:
             with open(file, "r") as f:
                 command_from_file = f.read()
         except FileNotFoundError:
             logger.error("%s not found", file)
+            sys.exit(1)
         except Exception as e:
             logger.error("An error occurred: %s", str(e))
+            sys.exit(1)
 
-        runner = Runner(dsn1, dsn2, command_from_file)
+        command_to_execute = command_from_file
 
-    runner.start_all()
-    runner.show_results()
+    try:
+        runner = Runner(dsn1, dsn2, command_to_execute)
+        runner.start_all()
+        runner.show_results()
+    except Exception as e:
+        logger.error("An error occurred during running queries:\n %s", str(e))
+        sys.exit(1)
 
 
 @cli.command()
@@ -110,8 +118,15 @@ def config(
     """Shows differences in configurations settings."""
     dsn1 = compose_dsn(host1, port1, dbname1, user1, password1, database1)
     dsn2 = compose_dsn(host2, port2, dbname2, user2, password2, database2)
-    runner = Runner(dsn1, dsn2, "SHOW ALL", True)
-    runner.start_all()
+    try:
+        runner = Runner(dsn1, dsn2, "SHOW ALL", True)
+        runner.start_all()
+    except Exception as e:
+        err_msg = (
+            "A problem occurred when running queries to compare configuration settings"
+        )
+        logger.error(f"{err_msg}:\n %s", str(e))
+        sys.exit(1)
 
     settings_diff = SettingsComparison(runner.results[0], runner.results[1])
     settings_diff.show_different_settings()

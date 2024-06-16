@@ -12,8 +12,12 @@ from .utils import compose_dsn
 logger = logging.getLogger()
 
 
-class DatabaseConnectionExecutionError(Exception):
-    """An error occurred while executing a database query"""
+class DatabaseConnectionError(Exception):
+    """An error occurred while connecting to a database"""
+
+
+class DatabaseQueryExecutionError(Exception):
+    """An error occurred while executing a query"""
 
 
 @dataclass(frozen=True, order=True)
@@ -55,22 +59,32 @@ class DatabaseConnection:
         conn = None
         result = None
         start = time.time()
+
         try:
             conn = psycopg2.connect(self.dsn)
-            conn.autocommit = True
+        except Exception as e:
+            if conn is not None:
+                conn.close()
+            raise DatabaseConnectionError(
+                f"Database connection error on {self.dsn}"
+            ) from e
 
+        conn.autocommit = True
+
+        try:
             with conn.cursor() as curs:
                 curs.execute(query)
 
                 if need_result:
                     result = curs.fetchall()
-        except Exception as exc:
-            raise DatabaseConnectionExecutionError(
-                "An error occurred while executing query."
-            ) from exc
-        finally:
+
             end = time.time()
             logger.info(f"Query running on {self.parsed_dsn['dbname']} completed.")
+        except Exception as exc:
+            raise DatabaseQueryExecutionError(
+                f"Query execution error on {self.dsn} \n{str(exc)}"
+            )
+        finally:
             if conn is not None:
                 conn.close()
 
